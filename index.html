@@ -5011,6 +5011,7 @@
     }
 
     function startAudioPlayback() {
+        stopQuestionAudio();
         simulatedAudioPlaying = true;
         const btn = $('#audio-play-toggle');
         if (btn) btn.textContent = '⏸';
@@ -5183,9 +5184,14 @@
                    <div class="timer-label">Thời gian còn lại</div>
                 </div>
                 <div style="margin-top: 10px;">
-                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                       <span style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;">Danh sách câu</span>
                       <span class="skill-pill ${courseConfig.skill.toLowerCase()}">${courseConfig.skill}</span>
+                   </div>
+                   <!-- Chuyển đổi chế độ làm bài: Từng câu vs Cuộn toàn bộ -->
+                   <div style="display:flex; gap:4px; margin-bottom:10px; background:#f1f5f9; padding:3px; border-radius:8px;">
+                      <button type="button" class="tab-btn" id="btn-mode-single" onclick="toggleExamDisplayMode('single')" style="flex:1; padding:5px 6px; font-size:11px; font-weight:600; border-radius:6px; border:none; background:#fff; color:var(--green-dark); box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer;">📄 Từng câu</button>
+                      <button type="button" class="tab-btn" id="btn-mode-scroll" onclick="toggleExamDisplayMode('scroll')" style="flex:1; padding:5px 6px; font-size:11px; font-weight:600; border-radius:6px; border:none; background:transparent; color:var(--muted); cursor:pointer;">📑 Cuộn toàn đề</button>
                    </div>
                    <div class="question-grid" id="question-grid"></div>
                 </div>
@@ -5214,10 +5220,275 @@
         `).join('');
         $$('.q-btn').forEach(btn => btn.addEventListener('click', () => {
             stopAudioPlayback();
+            stopQuestionAudio();
             questionIndex = Number(btn.dataset.qindex);
-            renderQuestion();
-            renderQuestionGrid();
+            if (examDisplayMode === 'scroll') {
+                const targetCard = document.getElementById(`scroll-q-${questionIndex}`);
+                if (targetCard) {
+                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetCard.style.outline = '2px solid var(--green)';
+                    setTimeout(() => { if (targetCard) targetCard.style.outline = ''; }, 1500);
+                }
+            } else {
+                renderQuestion();
+                renderQuestionGrid();
+            }
         }));
+    }
+
+    let examDisplayMode = 'single'; // 'single' hoặc 'scroll'
+    let isQuestionAudioPlaying = false;
+    let activeQuestionUtterance = null;
+
+    function toggleExamDisplayMode(mode) {
+        examDisplayMode = mode;
+        stopAudioPlayback();
+        stopQuestionAudio();
+        
+        const bSingle = $('#btn-mode-single');
+        const bScroll = $('#btn-mode-scroll');
+        if (bSingle) {
+            bSingle.style.background = mode === 'single' ? '#fff' : 'transparent';
+            bSingle.style.color = mode === 'single' ? 'var(--green-dark)' : 'var(--muted)';
+            bSingle.style.boxShadow = mode === 'single' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+        }
+        if (bScroll) {
+            bScroll.style.background = mode === 'scroll' ? '#fff' : 'transparent';
+            bScroll.style.color = mode === 'scroll' ? 'var(--green-dark)' : 'var(--muted)';
+            bScroll.style.boxShadow = mode === 'scroll' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+        }
+
+        if (examDisplayMode === 'scroll') {
+            renderAllQuestionsScroll();
+        } else {
+            renderQuestion();
+        }
+    }
+
+    function getQuestionAudioSnippet(qIdx) {
+        if (!currentExamData || !currentExamData.audioScript) return '';
+        const script = currentExamData.audioScript;
+        const qNum = qIdx + 1;
+
+        // 1. Phân loại theo [Photo N] (TOEIC Part 1)
+        const photoRegex = new RegExp(`\\[Photo\\s*${qNum}\\][\\s\\S]*?(?=\\[Photo|PART|CONVERSATION|TALK|$)`, 'i');
+        const photoMatch = script.match(photoRegex);
+        if (photoMatch) return photoMatch[0].trim();
+
+        // 2. Phân loại theo số câu ví dụ: "7. Man: ..." (TOEIC Part 2)
+        const numRegex = new RegExp(`(?:^|\n)\\s*${qNum}\\.\\s*[\\s\\S]*?(?=(?:^|\n)\\s*${qNum + 1}\\.|PART|CONVERSATION|TALK|$)`, 'i');
+        const numMatch = script.match(numRegex);
+        if (numMatch) return numMatch[0].trim();
+
+        // 3. Phân loại đoạn hội thoại Part 3 (Nhóm 3 câu)
+        if (qNum >= 14 && qNum <= 16) {
+            const c1 = script.match(/CONVERSATION\s*1[\s\S]*?(?=CONVERSATION\s*2|PART|$)/i);
+            if (c1) return c1[0].trim();
+        } else if (qNum >= 17 && qNum <= 19) {
+            const c2 = script.match(/CONVERSATION\s*2[\s\S]*?(?=CONVERSATION\s*3|PART|$)/i);
+            if (c2) return c2[0].trim();
+        } else if (qNum >= 20 && qNum <= 22) {
+            const c3 = script.match(/CONVERSATION\s*3[\s\S]*?(?=TALK|PART|$)/i);
+            if (c3) return c3[0].trim();
+        } else if (qNum >= 23 && qNum <= 25) {
+            const t1 = script.match(/TALK\s*1[\s\S]*?$/i);
+            if (t1) return t1[0].trim();
+        }
+
+        // 4. Nếu là IELTS Section
+        if (script.includes('SECTION')) {
+            const lines = script.split('\n').filter(l => l.trim().length > 0);
+            const chunk = lines.slice(Math.max(0, (qIdx % 4) * 4), Math.max(0, (qIdx % 4) * 4) + 6).join(' ');
+            if (chunk) return chunk;
+        }
+
+        // 5. Dự phòng: Đọc câu hỏi và các lựa chọn
+        const qObj = currentQuestions[qIdx];
+        if (qObj) {
+            let res = `Question ${qNum}. ` + qObj.text;
+            if (qObj.choices && qObj.choices.length) {
+                res += '... ' + qObj.choices.map((c, i) => `Option ${String.fromCharCode(65 + i)}: ${c}`).join('. ... ');
+            }
+            return res;
+        }
+        return '';
+    }
+
+    function playQuestionAudio(qIdx) {
+        if (isQuestionAudioPlaying) {
+            stopQuestionAudio();
+            return;
+        }
+        stopAudioPlayback(); // Dừng audio bài tổng thể nếu đang bật
+        
+        let textToSpeak = getQuestionAudioSnippet(qIdx);
+        if (!textToSpeak) textToSpeak = currentQuestions[qIdx]?.text || '';
+        
+        if (!window.speechSynthesis) {
+            alert('Trình duyệt của bạn chưa hỗ trợ Web Speech API.');
+            return;
+        }
+        window.speechSynthesis.cancel();
+        
+        isQuestionAudioPlaying = true;
+        const btn = document.getElementById(`btn-play-q-${qIdx}`);
+        if (btn) {
+            btn.innerHTML = '⏸ Dừng nghe câu này';
+            btn.style.background = '#fef2f2';
+            btn.style.color = '#b91c1c';
+            btn.style.borderColor = '#fecaca';
+        }
+
+        // Tạo ngắt nghỉ tự nhiên giữa các lựa chọn và lượt thoại
+        let cleanText = textToSpeak.replace(/\[Photo\s*\d+\]/gi, '')
+                                   .replace(/PART\s*\d+[^\n]*/gi, '')
+                                   .replace(/\(A\)/g, '. ... Option A: ')
+                                   .replace(/\(B\)/g, '. ... Option B: ')
+                                   .replace(/\(C\)/g, '. ... Option C: ')
+                                   .replace(/\(D\)/g, '. ... Option D: ')
+                                   .replace(/(Narrator:)/gi, '. ... Narrator: ')
+                                   .replace(/(Man:)/gi, '. ... Man: ')
+                                   .replace(/(Woman:)/gi, '. ... Woman: ')
+                                   .replace(/(Caller.*?):/gi, '. ... Caller: ')
+                                   .replace(/(Receptionist.*?):/gi, '. ... Receptionist: ')
+                                   .replace(/(Team Leader.*?):/gi, '. ... Team Leader: ')
+                                   .replace(/(Marketing Executive.*?):/gi, '. ... Speaker: ')
+                                   .replace(/(Employee.*?):/gi, '. ... Speaker: ');
+
+        activeQuestionUtterance = new SpeechSynthesisUtterance(cleanText);
+        activeQuestionUtterance.lang = 'en-US';
+        activeQuestionUtterance.rate = Math.min(1.15, Math.max(0.8, currentAudioSpeed));
+        
+        // Chọn giọng đọc tiếng Anh tự nhiên nếu có sẵn
+        if (window.speechSynthesis.getVoices) {
+            const vList = window.speechSynthesis.getVoices() || [];
+            const naturalVoice = vList.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Online')))
+                              || vList.find(v => v.lang.startsWith('en'));
+            if (naturalVoice) activeQuestionUtterance.voice = naturalVoice;
+        }
+
+        activeQuestionUtterance.onend = () => stopQuestionAudio(qIdx);
+        activeQuestionUtterance.onerror = () => stopQuestionAudio(qIdx);
+        
+        window.speechSynthesis.speak(activeQuestionUtterance);
+    }
+
+    function stopQuestionAudio(qIdx) {
+        isQuestionAudioPlaying = false;
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+        
+        const btns = $$('.btn-play-q');
+        btns.forEach(b => {
+            const num = b.dataset.qnum || '';
+            b.innerHTML = num ? `🔊 Nghe câu ${num}` : '🔊 Nghe audio câu này';
+            b.style.background = '#f0fdf4';
+            b.style.color = '#15803d';
+            b.style.borderColor = '#86efac';
+        });
+    }
+
+    function renderAllQuestionsScroll() {
+        stopQuestionAudio();
+        stopAudioPlayback();
+        const isListening = !!(currentExamData && currentExamData.audioTitle);
+
+        let html = `
+          <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+               <span style="font-size:12px; font-weight:700; color:var(--green-dark); background:#f0fdf4; padding:5px 12px; border-radius:20px; border:1px solid #bbf7d0;">
+                 📑 Bảng câu hỏi toàn bộ đề thi (${currentQuestions.length} câu)
+               </span>
+               <span style="font-size:11.5px; color:var(--muted);">Cuộn chuột lên xuống để làm bài tự do giống HSK / TOEIC CBT</span>
+            </div>
+            ${isListening ? `
+              <div class="audio-box" style="margin-bottom:16px; flex-wrap:wrap;">
+                 <button class="audio-play-btn" id="audio-play-toggle" onclick="toggleSimulatedAudio()" title="Phát/Dừng toàn bài">▶</button>
+                 <div class="audio-track" style="min-width:220px;">
+                    <div class="audio-title">
+                       <span>${currentExamData.audioTitle}</span>
+                       <span id="audio-time-label">0:00 / 1:30 (${currentAudioSpeed}x)</span>
+                    </div>
+                    <div class="audio-wave"><div class="audio-progress" id="audio-progress-bar"></div></div>
+                 </div>
+                 <div style="display:flex; gap:4px; align-items:center; background:#fff; padding:4px 8px; border-radius:6px; border:1px solid #bbf7d0;">
+                    <span style="font-size:11px; font-weight:700; color:var(--muted);">Tốc độ:</span>
+                    <button type="button" class="speed-btn" onclick="setAudioSpeed(0.75)" style="padding:2px 6px; font-size:11.5px; border-radius:4px; border:1px solid #bbf7d0; cursor:pointer;">0.75x</button>
+                    <button type="button" class="speed-btn" onclick="setAudioSpeed(1.0)" style="padding:2px 6px; font-size:11.5px; border-radius:4px; border:1px solid #bbf7d0; cursor:pointer;">1.0x</button>
+                    <button type="button" class="speed-btn" onclick="setAudioSpeed(1.25)" style="padding:2px 6px; font-size:11.5px; border-radius:4px; border:1px solid #bbf7d0; cursor:pointer;">1.25x</button>
+                 </div>
+                 <span style="font-size:11px; color:#0369a1; background:#e0f2fe; padding:4px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                    🔒 Lời thoại Transcript ẩn trong lúc thi — Xem sau khi nộp bài
+                 </span>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            ${currentQuestions.map((q, idx) => {
+               const uAns = userAnswers[idx];
+               const hasAns = uAns !== null;
+               return `
+                 <div class="scroll-q-card" id="scroll-q-${idx}" style="background:#fff; border:1.5px solid ${hasAns ? 'var(--green)' : 'var(--line)'}; border-radius:12px; padding:16px 18px; box-shadow:0 2px 6px rgba(0,0,0,0.02); transition:border-color .15s;">
+                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                      <span style="font-size:12px; font-weight:700; color:${hasAns ? 'var(--green-dark)' : 'var(--muted)'};">
+                         Câu ${idx + 1} / ${currentQuestions.length} ${hasAns ? '✓ Đã chọn đáp án' : '• Chưa làm'}
+                      </span>
+                      ${isListening ? `
+                         <button type="button" class="tool-btn btn-play-q" id="btn-play-q-${idx}" data-qnum="${idx + 1}" onclick="playQuestionAudio(${idx})" style="padding:4px 10px; font-size:11.5px; background:#f0fdf4; border:1px solid #86efac; color:#15803d; font-weight:600; border-radius:6px; cursor:pointer;">
+                            🔊 Nghe câu ${idx + 1}
+                         </button>
+                      ` : ''}
+                   </div>
+
+                   <div style="font-size:14.5px; font-weight:600; margin-bottom:12px; line-height:1.4;">${q.text}</div>
+
+                   <div class="options" style="display:grid; gap:8px;">
+                      ${(q.choices || []).map((ch, cIdx) => {
+                         let cls = 'option';
+                         if (isReviewMode) {
+                            if (cIdx === q.answer) cls += ' correct';
+                            else if (cIdx === uAns) cls += ' wrong';
+                         } else if (uAns === cIdx) {
+                            cls += ' selected';
+                         }
+                         return `
+                           <button type="button" class="${cls}" style="${uAns === cIdx ? 'border-color:var(--green); background:#f0f8eb;' : ''}" onclick="selectAnswerInScroll(${idx}, ${cIdx})" ${isReviewMode ? 'disabled' : ''}>
+                              <span class="letter" style="${uAns === cIdx ? 'background:#d7ebc9; color:#356b41;' : ''}">${String.fromCharCode(65 + cIdx)}</span>
+                              <span>${ch}</span>
+                           </button>
+                         `;
+                      }).join('')}
+                   </div>
+                 </div>
+               `;
+            }).join('')}
+          </div>
+
+          <div style="margin-top:24px; text-align:center; padding-bottom:20px;">
+             <button type="button" class="primary" style="padding:12px 32px; font-size:14px; font-weight:700; border-radius:8px; cursor:pointer;" onclick="finishExam()">
+                Hoàn tất & Nộp bài thi
+             </button>
+          </div>
+        `;
+
+        $('#exam-main-area').innerHTML = html;
+    }
+
+    function selectAnswerInScroll(qIdx, choiceIdx) {
+        if (isReviewMode) return;
+        userAnswers[qIdx] = choiceIdx;
+        
+        correctAnswers = 0;
+        userAnswers.forEach((ans, idx) => {
+            if (ans !== null && ans === currentQuestions[idx]?.answer) {
+                correctAnswers++;
+            }
+        });
+
+        renderQuestionGrid();
+        renderAllQuestionsScroll();
     }
 
     function renderQuestion() {
@@ -5243,12 +5514,12 @@
           </div>
         `;
 
-        // Audio Player (cho Listening có chỉnh tốc độ)
+        // Audio Player (cho Listening: ẩn Transcript trong lúc thi, thêm nút phát riêng câu hiện tại)
         let mediaHtml = '';
         if (currentExamData && currentExamData.audioTitle) {
             mediaHtml = `
               <div class="audio-box" style="flex-wrap: wrap;">
-                 <button class="audio-play-btn" id="audio-play-toggle" onclick="toggleSimulatedAudio()">▶</button>
+                 <button class="audio-play-btn" id="audio-play-toggle" onclick="toggleSimulatedAudio()" title="Phát / Dừng toàn bộ bài nghe">▶</button>
                  <div class="audio-track" style="min-width: 220px;">
                     <div class="audio-title">
                        <span>${currentExamData.audioTitle}</span>
@@ -5262,9 +5533,38 @@
                     <button type="button" class="speed-btn" data-speed="1.0" onclick="setAudioSpeed(1.0)" style="padding:2px 6px; font-size:11.5px; border:1px solid ${currentAudioSpeed === 1.0 ? 'var(--green)' : '#bbf7d0'}; background:${currentAudioSpeed === 1.0 ? 'var(--green)' : 'none'}; color:${currentAudioSpeed === 1.0 ? '#fff' : 'inherit'}; cursor:pointer; font-weight:600; border-radius:4px;">1.0x</button>
                     <button type="button" class="speed-btn" data-speed="1.25" onclick="setAudioSpeed(1.25)" style="padding:2px 6px; font-size:11.5px; border:1px solid ${currentAudioSpeed === 1.25 ? 'var(--green)' : '#bbf7d0'}; background:${currentAudioSpeed === 1.25 ? 'var(--green)' : 'none'}; color:${currentAudioSpeed === 1.25 ? '#fff' : 'inherit'}; cursor:pointer; font-weight:600; border-radius:4px;">1.25x</button>
                  </div>
-                 <button type="button" class="text-button" style="font-size:11.5px; padding:5px 9px; border:1px solid #bbf7d0; border-radius:6px;" onclick="$('#audio-transcript').classList.toggle('show')">Lời thoại (Transcript)</button>
+                 
+                 ${isReviewMode ? `
+                    <button type="button" class="tool-btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:700; font-size:11.5px;" onclick="$('#audio-transcript').classList.toggle('show')">
+                       📖 Xem Lời thoại chi tiết (Transcript)
+                    </button>
+                 ` : `
+                    <span style="font-size:11px; color:#0369a1; background:#e0f2fe; padding:4px 9px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                       🔒 Lời thoại Transcript được ẩn trong lúc thi — Xem sau khi nộp bài
+                    </span>
+                 `}
               </div>
-              <div class="transcript-box" id="audio-transcript">${currentExamData.audioScript || ''}</div>
+
+              <!-- Thanh Nghe Audio Riêng Cho Câu Hiện Tại -->
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                 <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:18px;">🎧</span>
+                    <div>
+                       <strong style="font-size:12.5px; color:var(--green-dark);">Đoạn nghe của câu ${questionIndex + 1}</strong>
+                       <span style="font-size:11px; color:var(--muted); display:block;">Đọc tách riêng câu này với ngắt nghỉ tự nhiên</span>
+                    </div>
+                 </div>
+                 <button type="button" class="tool-btn btn-play-q" id="btn-play-q-${questionIndex}" data-qnum="${questionIndex + 1}" onclick="playQuestionAudio(${questionIndex})" style="background:#f0fdf4; border:1px solid #86efac; color:#15803d; font-weight:700; padding:6px 14px; font-size:12px; border-radius:6px; cursor:pointer;">
+                    🔊 Nghe audio câu này
+                 </button>
+              </div>
+
+              ${isReviewMode ? `
+                 <div class="transcript-box" id="audio-transcript" style="display:none; margin-top:10px; background:#fff; border:1px dashed #86efac; padding:14px; border-radius:8px; font-size:12.5px; line-height:1.7; color:#334155;">
+                    <strong style="color:var(--green-dark); display:block; margin-bottom:6px;">📑 Kịch bản Audio chính thức (Official Script):</strong>
+                    ${(currentExamData.audioScript || '').replace(/\n/g, '<br>')}
+                 </div>
+              ` : ''}
             `;
         }
 
@@ -5438,6 +5738,7 @@
     function finishExam() {
         if (examTimer) clearInterval(examTimer);
         stopAudioPlayback();
+        stopQuestionAudio();
 
         const courseConfig = courses.find(c => c.title === currentExamTitle) || { kind: 'TOEIC', skill: 'Reading' };
         const total = currentQuestions.length;
@@ -5467,7 +5768,9 @@
             total: total,
             timeSpent: timeSpent,
             questions: currentQuestions,
-            userAnswers: [...userAnswers]
+            userAnswers: [...userAnswers],
+            audioScript: currentExamData?.audioScript || '',
+            audioTitle: currentExamData?.audioTitle || ''
         };
         history.unshift(examRecord);
         localStorage.setItem('lingua-history', JSON.stringify(history.slice(0, 50)));
@@ -5496,6 +5799,18 @@
                 Kết quả bài thi đã được lưu vào lịch sử học tập cá nhân theo thời gian thực. Bạn có thể xem lại chi tiết từng câu làm đúng / sai để rút kinh nghiệm.
              </p>
 
+             ${(currentExamData && currentExamData.audioScript) ? `
+                <div style="margin: 15px auto 22px; max-width: 620px; text-align: left;">
+                   <button type="button" class="tool-btn" style="width:100%; justify-content:center; padding:11px 16px; background:#f0fdf4; color:#15803d; border:1.5px solid #86efac; font-weight:700; font-size:13px; border-radius:8px; cursor:pointer;" onclick="const t = $('#result-audio-transcript'); t.style.display = t.style.display === 'none' ? 'block' : 'none';">
+                      📑 Bấm xem toàn bộ Lời thoại Audio (Transcript) & Đối chiếu kết quả
+                   </button>
+                   <div id="result-audio-transcript" style="display:none; margin-top:10px; background:#fff; border:1px solid #bbf7d0; border-radius:10px; padding:16px; font-size:12.5px; line-height:1.7; max-height:280px; overflow-y:auto; color:#334155;">
+                      <strong style="color:var(--green-dark); display:block; margin-bottom:8px;">Kịch bản bài nghe chi tiết (Transcript):</strong>
+                      ${(currentExamData.audioScript || '').replace(/\n/g, '<br>')}
+                   </div>
+                </div>
+             ` : ''}
+
              <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
                 <button type="button" class="primary" onclick="openReviewModalFromLatest()">Xem lại chi tiết bài làm 🔍</button>
                 <button type="button" class="text-button" style="border:1px solid var(--line); border-radius:8px; padding:10px 16px; cursor:pointer;" onclick="closeExam()">Quay lại danh sách đề</button>
@@ -5511,6 +5826,7 @@
     function closeExam() {
         if (examTimer) clearInterval(examTimer);
         stopAudioPlayback();
+        stopQuestionAudio();
         const el = $('#exam-backdrop');
         if (el) {
             el.classList.remove('open');
@@ -5552,10 +5868,22 @@
         $('#review-exam-label').textContent = `Xem lại: ${record.title}`;
         $('#review-exam-meta').textContent = `${new Date(record.date).toLocaleString('vi-VN')} · Đúng ${record.correct}/${record.total} câu · ${record.scoreSummary ? record.scoreSummary.display : record.score + '%'}`;
         
+        const transcriptHeader = (record.audioScript || (examDatabase[record.title] && examDatabase[record.title].audioScript)) ? `
+           <div style="margin-bottom:16px;">
+              <button type="button" class="tool-btn" style="width:100%; justify-content:center; padding:10px 16px; background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:700; font-size:12.5px; border-radius:8px; cursor:pointer;" onclick="const el = $('#rev-audio-script'); el.style.display = el.style.display === 'none' ? 'block' : 'none';">
+                 📑 Bấm xem Kịch bản Audio (Transcript) của bài thi này
+              </button>
+              <div id="rev-audio-script" style="display:none; margin-top:10px; background:#fff; border:1px solid #bbf7d0; border-radius:10px; padding:14px; font-size:12.5px; line-height:1.7; max-height:260px; overflow-y:auto; color:#334155;">
+                 <strong style="color:var(--green-dark); display:block; margin-bottom:6px;">Lời thoại chi tiết (Official Script):</strong>
+                 ${(record.audioScript || (examDatabase[record.title] && examDatabase[record.title].audioScript) || '').replace(/\n/g, '<br>')}
+              </div>
+           </div>
+        ` : '';
+
         const qList = record.questions || [];
         const uAnsList = record.userAnswers || [];
 
-        $('#review-content').innerHTML = qList.map((q, i) => {
+        $('#review-content').innerHTML = transcriptHeader + qList.map((q, i) => {
             const uAns = uAnsList[i];
             const isCorrect = uAns === q.answer;
             const isSkipped = uAns === null || uAns === undefined;
