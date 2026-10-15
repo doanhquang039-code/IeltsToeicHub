@@ -1,0 +1,183 @@
+
+        <!-- ============================================================== -->
+        <!-- VIEW: ADMIN DASHBOARD - QUẢN LÝ & UPLOAD ĐỀ THI ĐỊNH KỲ        -->
+        <!-- ============================================================== -->
+        <section class="view" id="view-admin" style="display:none;">
+          <div class="page-title-row" style="margin-bottom:20px;">
+            <div>
+              <div style="display:inline-flex; align-items:center; gap:6px; background:#fef9c3; color:#854d0e; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:800; margin-bottom:6px;">
+                <span>🛡️</span> CỔNG QUẢN TRỊ VIÊN DÀNH RIÊNG CHO ADMIN & GIẢNG VIÊN
+              </div>
+              <h1 style="margin:0 0 6px; font-size:26px;">Trung tâm Quản trị & Tải lên Đề thi</h1>
+              <p style="margin:0; color:var(--muted); font-size:13px;">Đăng tải, cập nhật ngân hàng đề thi TOEIC & IELTS thường xuyên từ file JSON, Word (.docx), Excel (.xlsx) hoặc nhập trực tiếp.</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <span id="admin-badge-status" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:6px 14px; border-radius:8px; font-weight:700; font-size:12px;">
+                ● Admin Mode: Đang kích hoạt
+              </span>
+              <button type="button" class="close-modal" onclick="showView('overview')" title="Quay lại Trang chủ" aria-label="Đóng">✕</button>
+            </div>
+          </div>
+
+          <!-- Thống kê nhanh hệ thống đề thi -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px; margin-bottom:24px;">
+            <div style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; border-left:4px solid #10b981; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+              <span style="font-size:11.5px; color:var(--muted); font-weight:700; text-transform:uppercase;">Tổng số đề trong hệ thống</span>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px;">
+                <strong id="admin-total-courses" style="font-size:26px; font-family:var(--display); color:var(--green-dark);">12</strong>
+                <span style="font-size:11px; background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:999px; font-weight:700;">ETS & Cambridge</span>
+              </div>
+            </div>
+
+            <div style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; border-left:4px solid #3b82f6; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+              <span style="font-size:11.5px; color:var(--muted); font-weight:700; text-transform:uppercase;">Đề thi do Admin tải lên</span>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px;">
+                <strong id="admin-custom-courses-count" style="font-size:26px; font-family:var(--display); color:#1d4ed8;">0</strong>
+                <span style="font-size:11px; background:#eff6ff; color:#1d4ed8; padding:2px 8px; border-radius:999px; font-weight:700;">Custom Uploads</span>
+              </div>
+            </div>
+
+            <div style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; border-left:4px solid #f59e0b; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+              <span style="font-size:11.5px; color:var(--muted); font-weight:700; text-transform:uppercase;">Báo cáo lỗi từ Học viên</span>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px;">
+                <strong id="admin-pending-reports-count" style="font-size:26px; font-family:var(--display); color:#b45309;">0</strong>
+                <span style="font-size:11px; background:#fef3c7; color:#b45309; padding:2px 8px; border-radius:999px; font-weight:700;">Cần xử lý</span>
+              </div>
+            </div>
+
+            <div style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; border-left:4px solid #8b5cf6; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+              <span style="font-size:11.5px; color:var(--muted); font-weight:700; text-transform:uppercase;">Trạng thái cập nhật</span>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px;">
+                <strong style="font-size:18px; color:#6d28d9;">Tự động đồng bộ</strong>
+                <span style="font-size:11px; color:var(--muted);">Real-time</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bố cục 2 cột: Upload Form & Danh sách Đề thi -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:22px; align-items:start;">
+            <!-- Cột trái: Form Upload Đề thi -->
+            <div style="background:#fff; border:1px solid var(--line); border-radius:14px; padding:22px; box-shadow:0 4px 15px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:20px;">📤</span>
+                  <h3 style="margin:0; font-size:16px; color:var(--green-dark);">Tải lên Đề thi Mới (Upload Test)</h3>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button type="button" class="tab-btn active" id="btn-tab-upload-file" onclick="switchAdminUploadMode('file')" style="font-size:12px; padding:6px 12px;">📁 File Upload</button>
+                  <button type="button" class="tab-btn" id="btn-tab-upload-manual" onclick="switchAdminUploadMode('manual')" style="font-size:12px; padding:6px 12px;">✍️ Soạn thủ công</button>
+                </div>
+              </div>
+
+              <!-- Mode 1: Kéo thả file đề thi (JSON / Word / Excel) -->
+              <div id="admin-upload-file-pane">
+                <div style="border:2px dashed #93c5fd; border-radius:12px; background:#eff6ff; padding:28px 20px; text-align:center; cursor:pointer; margin-bottom:18px; transition:all .2s;" id="admin-file-dropzone" onclick="$('#admin-exam-file-input').click()">
+                  <div style="font-size:36px; margin-bottom:8px;">📄</div>
+                  <strong style="font-size:14.5px; color:#1e40af; display:block; margin-bottom:4px;">Kéo & Thả hoặc Bấm để tải file Đề thi</strong>
+                  <p style="margin:0; font-size:12px; color:#3b82f6;">Hỗ trợ cấu trúc <span style="font-weight:700;">.json</span> (Đề thi chuẩn), <span style="font-weight:700;">.docx</span> (Word đề bài) hoặc <span style="font-weight:700;">.xlsx</span> (Excel câu hỏi/đáp án)</p>
+                  <input type="file" id="admin-exam-file-input" accept=".json,.docx,.xlsx,.txt" style="display:none;" onchange="handleAdminFileSelected(event)">
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:16px; font-size:12.5px; color:#475569;">
+                  <strong style="color:var(--green-dark); display:block; margin-bottom:4px;">💡 Tải nhanh đề mẫu kiểm thử:</strong>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+                    <button type="button" class="sample-doc-btn" onclick="loadSampleAdminExam('toeic_listening_actual')">🏢 Thêm Đề TOEIC Listening 2025 Test 03</button>
+                    <button type="button" class="sample-doc-btn" onclick="loadSampleAdminExam('ielts_reading_cambridge')">🏛️ Thêm Đề Cambridge IELTS 19 Academic Test 01</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mode 2 & Thông tin đề thi cần cấu hình -->
+              <form id="admin-upload-exam-form" onsubmit="handleAdminSubmitExam(event)" style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                  <label style="font-size:11.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:4px;">TÊN ĐỀ THI / TIÊU ĐỀ BÀI LUYỆN (*)</label>
+                  <input type="text" id="admin-exam-title" class="auth-input" placeholder="VD: TOEIC Listening · Part 3: Conversations (ETS 2025 Test 01)" required style="padding:10px 12px; font-size:13px;">
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                  <div>
+                    <label style="font-size:11.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:4px;">KỲ THI (*)</label>
+                    <select id="admin-exam-kind" class="auth-input" style="padding:10px 12px; font-size:13px;" required>
+                      <option value="TOEIC" selected>TOEIC</option>
+                      <option value="IELTS">IELTS</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:11.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:4px;">KỸ NĂNG (*)</label>
+                    <select id="admin-exam-skill" class="auth-input" style="padding:10px 12px; font-size:13px;" required>
+                      <option value="Listening" selected>🎧 Listening (Nghe hiểu)</option>
+                      <option value="Reading">📖 Reading (Đọc hiểu)</option>
+                      <option value="Writing">✍️ Writing (Viết luận)</option>
+                      <option value="Speaking">🎙️ Speaking (Nói & Phỏng vấn)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                  <div>
+                    <label style="font-size:11.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:4px;">NGUỒN ĐỀ (*)</label>
+                    <select id="admin-exam-source" class="auth-input" style="padding:10px 12px; font-size:13px;" required>
+                      <option value="ETS" selected>ETS Official</option>
+                      <option value="Cambridge">Cambridge Official</option>
+                      <option value="Actual Test">🔥 Đề thi thật (Actual Test)</option>
+                      <option value="Lingua Custom">Lingua Master</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:11.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:4px;">THỜI GIAN LÀM BÀI (PHÚT)</label>
+                    <input type="number" id="admin-exam-time" class="auth-input" value="15" min="1" max="180" style="padding:10px 12px; font-size:13px;">
+                  </div>
+                </div>
+
+                <!-- Textarea câu hỏi (JSON hoặc định dạng câu hỏi) -->
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <label style="font-size:11.5px; font-weight:700; color:var(--muted);">DỮ LIỆU CÂU HỎI & ĐÁP ÁN (*)</label>
+                    <span style="font-size:11px; color:#2563eb; cursor:pointer;" onclick="fillAdminQuestionTemplate()">Chèn mẫu JSON chuẩn</span>
+                  </div>
+                  <textarea id="admin-exam-questions-json" class="auth-input" style="height:140px; font-family:monospace; font-size:12px; resize:vertical; line-height:1.5;" placeholder='[&#10;  {&#10;    "text": "The seminar on digital marketing will begin _____ at 9:00 AM.",&#10;    "choices": ["prompt", "promptly", "promptness", "prompting"],&#10;    "answer": 1,&#10;    "explain": "Cần trạng từ \'promptly\' bổ nghĩa cho động từ \'begin\'."&#10;  }&#10;]' required></textarea>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:8px;">
+                  <button type="submit" class="primary" style="flex:1; padding:12px; font-size:13.5px; font-weight:700; background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    🚀 Lưu & Đăng tải Đề thi vào Hệ thống
+                  </button>
+                  <button type="button" class="text-button" style="border:1px solid var(--line); padding:10px 16px; border-radius:8px;" onclick="resetAdminForm()">
+                    Làm mới
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Cột phải: Danh sách đề thi đã có & Công cụ quản lý -->
+            <div style="display:flex; flex-direction:column; gap:18px;">
+              <div style="background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                  <div>
+                    <h3 style="margin:0 0 2px; font-size:16px;">Ngân hàng đề thi đang hoạt động (<span id="admin-exam-count-badge">0</span>)</h3>
+                    <small style="color:var(--muted); font-size:11.5px;">Bấm 'Xem trước' để kiểm tra đề hoặc 'Xóa' để dọn dẹp</small>
+                  </div>
+                  <div style="display:flex; gap:6px;">
+                    <button type="button" class="filter-pill-btn active" data-admin-filter="all" onclick="filterAdminExams('all')">Tất cả</button>
+                    <button type="button" class="filter-pill-btn" data-admin-filter="TOEIC" onclick="filterAdminExams('TOEIC')">TOEIC</button>
+                    <button type="button" class="filter-pill-btn" data-admin-filter="IELTS" onclick="filterAdminExams('IELTS')">IELTS</button>
+                  </div>
+                </div>
+
+                <div id="admin-exams-list-container" style="max-height:560px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:4px;">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+
+              <!-- Hộp Hướng dẫn chuẩn hóa đề thi -->
+              <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px; font-size:12.5px; color:#166534; line-height:1.6;">
+                <strong style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:13px;">
+                  <span>📋</span> Quy chuẩn nạp đề thi cho Admin
+                </strong>
+                • Mỗi đề thi tải lên lập tức hiển thị tại mục <strong>"1. Luyện đề 4 kỹ năng"</strong> cho toàn bộ học viên.<br>
+                • Câu hỏi hỗ trợ đầy đủ 4 đáp án (A, B, C, D), giải thích ngữ pháp chi tiết bằng tiếng Việt và trích dẫn dịch nghĩa.<br>
+                • Với đề thi Speaking & Writing, hệ thống tự động gắn đồng hồ ghi âm trực tiếp và bài viết mẫu Band 8.5+.
+              </div>
+            </div>
+          </div>
+        </section>

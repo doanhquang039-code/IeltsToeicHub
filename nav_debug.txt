@@ -1,0 +1,9 @@
+<nav class="nav" aria-label="Điều hướng chính">
+        <button class="active" data-view="overview" onclick="showView('overview')"><span class="nav-glyph">⌂</span>Tổng quan</button>
+        <button data-view="practice" onclick="showView('practice')"><span class="nav-glyph">▤</span>Luyện đề 4 kỹ năng</button>
+        <button data-view="vocabulary" onclick="showView('vocabulary')"><span class="nav-glyph">Aa</span>Từ vựng</button>
+        <button data-view="progress" onclick="showView('progress')"><span class="nav-glyph">↗</span>Tiến độ & Lịch sử</button>
+        <button data-view="bookmarks" onclick="showView('bookmarks')"><span class="nav-glyph">★</span>Đã lưu & Báo cáo</button>
+        <button data-view="profile" onclick="showView('profile')"><span class="nav-glyph">👤</span>Hồ sơ mục tiêu</button>
+        <button data-view="analyzer" onclick="showView('analyzer')"><span class="nav-glyph">🤖</span>AI Phân tích tài liệu</button>
+      </nav>

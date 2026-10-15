@@ -1,0 +1,11 @@
+<header class="topbar">
+        <div class="crumb">Không gian học <span style="margin:0 7px;color:#bdc6bf">/</span> <b id="crumb-current">Tổng quan</b></div>
+        <div class="top-actions" style="display:flex; align-items:center; gap:10px;">
+           <span class="today" id="today-label"></span>
+           <button type="button" class="tool-btn" id="topbar-login-btn" onclick="showLogin()" style="background:var(--lime); color:var(--green-dark); font-weight:700; border:none; padding:7px 14px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px; font-size:12.5px; transition:transform .15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='none'">
+              <span>🔑</span> <span id="topbar-login-text">Đăng nhập / Đăng ký</span>
+           </button>
+           <button class="notify" aria-label="Thông báo">♧</button>
+           <div class="avatar" id="topbar-avatar" style="cursor:pointer;" title="Xem hồ sơ cá nhân" onclick="showView('profile')">MA</div>
+        </div>
+      </header>
